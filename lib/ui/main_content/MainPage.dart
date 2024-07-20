@@ -1,6 +1,9 @@
+import 'package:Linkedin/ui/main_content/ConnectionPage.dart';
+import 'package:Linkedin/ui/main_content/PostPage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import '../../models/Post.dart';
 import '../../models/User.dart';
 import '../Authentication/LoginPage.dart';
 
@@ -51,23 +54,26 @@ class _MainPageState extends State<MainPage> {
                   backgroundImage: NetworkImage(user.picture),
                 )),
             _buildDrawerItem(
-              icon: Icons.home,
-              text: 'Home',
+              icon: Icons.post_add,
+              text: 'Posts',
               iconColor: Colors.blue,
+              textColor: Colors.blue,
               onTap: () => _onItemTap(0),
             ),
             _buildDrawerItem(
-              icon: Icons.settings,
-              text: 'Settings',
+              icon: Icons.chat,
               iconColor: Colors.blue,
+              text: 'Chats',
+              textColor: Colors.blue,
               onTap: () => _onItemTap(1),
             ),
             // Add more items here if needed
             Divider(),
             _buildDrawerItem(
               icon: Icons.exit_to_app,
-              text: 'Sign Out',
               iconColor: Colors.blue,
+              text: 'Sign Out',
+              textColor: Colors.blue,
               onTap: _signOut,
             ),
           ],
@@ -112,21 +118,18 @@ class _MainPageState extends State<MainPage> {
   Widget _buildBody() {
     switch (_selectedIndex) {
       case 0: // Accueil
-        return Center(
-          child: Text("Page non trouvée"),
-        );
-      case 1: // Paramètres
-        return Center(
-          child: Text("Page non trouvée"),
-        );
+        return PostPage() ;
+      case 1: // Contacts
+        return ConnectionPage();
       // Ajoutez plus de cas pour d'autres indices/pages
       default:
         return Center(
-          child: Text("Page non trouvée"),
+          child: Text("Page not found"),
         );
     }
   }
 
+  //Method helpful to fetch all datas in the fluttersecurestorage
   Future<List<Map<String, String>>> getAllEntries() async {
     final _storage = const FlutterSecureStorage();
     final allValues = await _storage.readAll();
@@ -135,39 +138,59 @@ class _MainPageState extends State<MainPage> {
         .toList();
   }
 
-  // This method is useful to signout of the application
-  void _signOut() async {
-    try {
-      // Clear all entries in FlutterSecureStorage
-      await _storage.deleteAll();
-
-      final allEntries = await _storage.readAll();
-      //We add 2 seconds to ensure that all datas have been deleted
-      await Future.delayed(Duration(seconds: 2));
-
-      if (allEntries.isEmpty) {
-        // We go to the login page
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => LoginPage()),
-        );
-      }
-    } catch (error) {
-      // Handle errors that might occur during sign-out
-      print('Error signing out: ${error.toString()}');
-      // You can add more specific error handling here, like showing a snackbar or dialog to the user
-      // Consider also logging the error for debugging purposes
-    }
-  }
-
   String _getTitle() {
     switch (_selectedIndex) {
       case 0:
-        return 'Home';
+        return 'Posts';
       case 1:
-        return 'Settings';
+        return 'Contacts';
       default:
         return 'LinkedInAPI'; // Default title for unknown pages
+    }
+  }
+
+  // Method to signOut of the Application
+  void _signOut() async {
+    final shouldLogout = await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Sign Out Confirmation'),
+        content: Text('Are you sure you want to sign out?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false), // Cancel
+            child: Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true), // Confirm
+            child: Text('Sign Out'),
+          ),
+        ],
+        backgroundColor: Colors.white,
+      ),
+    );
+
+    if (shouldLogout ?? false) {
+      try {
+        // Clear all entries in FlutterSecureStorage
+        await _storage.deleteAll();
+
+        final allEntries = await _storage.readAll();
+        // We add 2 seconds to ensure that all datas have been deleted
+        await Future.delayed(Duration(seconds: 2));
+
+        if (allEntries.isEmpty) {
+          // We go to the login page
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => LoginPage()),
+          );
+        }
+      } catch (error) {
+        // Handle errors that might occur during sign-out
+        print('Error signing out: ${error.toString()}');
+        // Add more specific error handling here
+      }
     }
   }
 }

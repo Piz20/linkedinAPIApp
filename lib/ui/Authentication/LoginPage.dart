@@ -1,24 +1,76 @@
-import 'package:Linkedin/ui/main_content/MainPage.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:linkedin_login/linkedin_login.dart';
-
-import '../../models/User.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key});
-
   @override
-  State<LoginPage> createState() => _LoginPageState();
+  _LoginPageState createState() => _LoginPageState();
 }
-// Simulate loading delay (replace with actual LinkedIn login status)
 
 class _LoginPageState extends State<LoginPage> {
-  final _storage = const FlutterSecureStorage();
+  String? _url;
 
-  Future<void> _simulateLoading() async {
-    await Future.delayed(const Duration(seconds: 3));
+  @override
+  void initState() {
+    super.initState();
+    _fetchLinkAndOpenWebView();
+  }
+
+  Future<void> _fetchLinkAndOpenWebView() async {
+    try {
+      final response = await http.post(
+        Uri.parse('https://api2.unipile.com:13237/api/v1/hosted/accounts/link'),
+        headers: {
+          'X-API-KEY': dotenv.env['UNIPILE_ACCESS_TOKEN']!,
+          'accept': 'application/json',
+          'content-type': 'application/json',
+        },
+        body: jsonEncode({
+          'type': 'create',
+          'providers': ['LINKEDIN'],
+          'api_url': 'https://api2.unipile.com:13237',
+          'expiresOn': '2024-12-22T12:00:00.701Z',
+        }),
+      );
+
+      if (response.statusCode == 201) {
+        final jsonResponse = jsonDecode(response.body);
+        print('Response: $jsonResponse');
+        if (jsonResponse.containsKey('url')) {
+          setState(() {
+            _url = jsonResponse['url'];
+          });
+          _launchURL(_url!);
+        } else {
+          print('Error: Response does not contain "url" key');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to load link. Try again later.'),
+            ),
+          );
+        }
+      } else {
+        print('Error: Status code ${response.statusCode}');
+        throw Exception('Failed to load link (status code: ${response.statusCode})');
+      }
+    } catch (e) {
+      print('Error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('An error occurred. Please try again.'),
+        ),
+      );
+    }
+  }
+
+  void _launchURL(String url) async {
+    if (await canLaunch(url)) {
+      await launch(url);
+    } else {
+      throw 'Could not launch $url';
+    }
   }
 
   @override
@@ -26,70 +78,16 @@ class _LoginPageState extends State<LoginPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Login'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
       ),
-      backgroundColor: Colors.white,
-      body: FutureBuilder(
-        future: _simulateLoading(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(),
-            );
-          } else {
-            return Center(
-              child: LinkedInUserWidget(
-                clientId: dotenv.env['LINKEDIN_CLIENT_ID']!,
-                clientSecret: dotenv.env['LINKEDIN_CLIENT_SECRET']!,
-                redirectUrl: dotenv.env['LINKEDIN_REDIRECT_URL']!,
-                destroySession: true,
-                onGetUserProfile: (UserSucceededAction linkedInUser) async {
-                  print('Access token ${linkedInUser.user.token.accessToken}');
-                  print('First name: ${linkedInUser.user.givenName}');
-                  print('Last name: ${linkedInUser.user.familyName}');
-
-                  User user = new User(
-                      sub: linkedInUser.user.sub.toString(),
-                      givenName: linkedInUser.user.givenName.toString(),
-                      familyName: linkedInUser.user.familyName.toString(),
-                      name: linkedInUser.user.name.toString(),
-                      email: linkedInUser.user.email.toString(),
-                      picture: linkedInUser.user.picture.toString(),
-                      token: linkedInUser.user.token.accessToken.toString());
-
-                  await _storeUserInfo(user);
-
-                  await Future.delayed(Duration(seconds: 2));
-
-                  final allEntries = await _storage.readAll();
-                  if (allEntries.isNotEmpty) {
-                    // We go to the login page
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => MainPage(
-                                currentUser: user,
-                              )),
-                    );
-                  }
-                },
-                onError: (UserFailedAction error) {
-                  // Handle login error
-                  print('LinkedIn login error: ${error.toString()}');
-                },
-              ),
-            );
-          }
-        },
+      body: Center(
+        child: _url == null
+            ? CircularProgressIndicator()
+            : ElevatedButton(
+          onPressed: () => _launchURL(_url!),
+          child: Text('Open WebView'),
+        ),
       ),
     );
   }
-
-  Future<void> _storeUserInfo(User user) async {
-    final userMap = user.toMap();
-    for (final entry in userMap.entries) {
-      await _storage.write(key: entry.key, value: entry.value);
-    }
-  }
 }
+

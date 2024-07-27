@@ -9,7 +9,9 @@ import '../../models/Connection.dart';
 import '../../models/Post.dart';
 
 class PostPage extends StatefulWidget {
-  const PostPage({super.key});
+  final String accountId;
+
+  PostPage({super.key, required this.accountId});
 
   @override
   _PostPageState createState() => _PostPageState();
@@ -40,7 +42,7 @@ class _PostPageState extends State<PostPage> {
   Future<UserData> fetchUserData() async {
     final response = await http.get(
       Uri.parse(
-          'https://api2.unipile.com:13237/api/v1/users/me?account_id=${dotenv.env['UNIPILE_ACCOUNT_ID']}'),
+          'https://api2.unipile.com:13237/api/v1/users/me?account_id=${widget.accountId}'),
       headers: {
         'X-API-KEY': dotenv.env['UNIPILE_ACCESS_TOKEN']!,
         'accept': 'application/json',
@@ -57,7 +59,7 @@ class _PostPageState extends State<PostPage> {
 
   Future<void> fetchAllConnections() async {
     var url = Uri.parse(
-        'https://api2.unipile.com:13237/api/v1/users/relations?account_id=${dotenv.env['UNIPILE_ACCOUNT_ID']}');
+        'https://api2.unipile.com:13237/api/v1/users/relations?account_id=${widget.accountId}');
     var headers = {
       'Accept': 'application/json',
       'X-Api-Key': dotenv.env['UNIPILE_ACCESS_TOKEN']!
@@ -134,69 +136,80 @@ class _PostPageState extends State<PostPage> {
     }
   }
 
+  // Méthode pour rafraîchir les posts
+  Future<void> _refreshPosts() async {
+    if (selectedUserId != null) {
+      await fetchUserPosts(selectedUserId!);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: DropdownButtonHideUnderline(
-          child: DropdownButton<String>(
-            value: selectedConnection?.id,
-            hint: Text(
-              _getDropdownHint(),
-              // Get the hint based on the selected connection
-              overflow: TextOverflow.ellipsis,
-            ),
-            onChanged: (String? newValue) {
-              setState(() {
-                selectedConnection =
-                    connections.firstWhere((c) => c.id == newValue);
-                fetchUserPosts(newValue!);
-              });
-            },
-            items: connections
-                .map<DropdownMenuItem<String>>((Connection connection) {
-              return DropdownMenuItem<String>(
-                value: connection.id,
-                child: Container(
-                  color: Colors.transparent,
-                  // Set background color to transparent
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        backgroundImage: NetworkImage(connection.picture),
-                      ),
-                      SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          connection.name,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            }).toList(),
-            // Set the width of the DropdownButton
-            itemHeight: 60,
-            // Adjust item height if necessary
-            isExpanded: true,
-          ),
-        ),
-        centerTitle: false, // Align title to the left
-        actions: [
-          // Add any actions if necessary
-        ],
-      ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator())
-          : ListView.builder(
-              itemCount: posts.length,
-              itemBuilder: (context, index) {
-                return _buildPostCard(posts[index]);
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          title: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              value: selectedConnection?.id,
+              hint: Text(
+                _getDropdownHint(),
+                // Get the hint based on the selected connection
+                overflow: TextOverflow.ellipsis,
+              ),
+              onChanged: (String? newValue) {
+                setState(() {
+                  selectedConnection =
+                      connections.firstWhere((c) => c.id == newValue);
+                  fetchUserPosts(newValue!);
+                });
               },
+              items: connections
+                  .map<DropdownMenuItem<String>>((Connection connection) {
+                return DropdownMenuItem<String>(
+                  value: connection.id,
+                  child: Container(
+                    color: Colors.transparent,
+                    // Set background color to transparent
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          backgroundImage: NetworkImage(connection.picture),
+                        ),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            connection.name,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+              // Set the width of the DropdownButton
+              itemHeight: 60,
+              // Adjust item height if necessary
+              isExpanded: true,
+              dropdownColor: Colors.white,
             ),
-    );
+          ),
+          centerTitle: false, // Align title to the left
+          actions: [
+            // Add any actions if necessary
+          ],
+        ),
+        body: RefreshIndicator(
+          onRefresh: _refreshPosts,
+          child: _isLoading
+              ? Center(child: CircularProgressIndicator())
+              : ListView.builder(
+                  itemCount: posts.length,
+                  itemBuilder: (context, index) {
+                    return _buildPostCard(posts[index]);
+                  },
+                ),
+        ));
   }
 
   Widget _buildPostCard(Post post) {
@@ -210,6 +223,7 @@ class _PostPageState extends State<PostPage> {
             lastName: selectedConnection!.name.split(' ').skip(1).join(' '),
             profilePictureUrl: selectedConnection!.picture,
             occupation: selectedConnection!.headline,
+            email: '',
           )
         : currentUserData!;
 

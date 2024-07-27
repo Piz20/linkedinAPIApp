@@ -9,6 +9,10 @@ import '../../models/Connection.dart';
 import 'MessagePage.dart';
 
 class ConnectionPage extends StatefulWidget {
+  final String accountId;
+
+  ConnectionPage({super.key, required this.accountId});
+
   @override
   _ConnectionPageState createState() => _ConnectionPageState();
 }
@@ -28,7 +32,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
   // Retrieve all the relations of the current User
   Future<void> fetchAllConnections() async {
     var url = Uri.parse(
-        'https://api2.unipile.com:13237/api/v1/users/relations?account_id=${dotenv.env['UNIPILE_ACCOUNT_ID']}');
+        'https://api2.unipile.com:13237/api/v1/users/relations?limit=500&account_id=${widget.accountId}');
     var headers = {
       'Accept': 'application/json',
       'X-Api-Key': dotenv.env['UNIPILE_ACCESS_TOKEN']!
@@ -41,7 +45,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
       if (jsonResponse.containsKey('items') && jsonResponse['items'] is List) {
         List<dynamic> items = jsonResponse['items'];
         List<Connection> loadedConnections =
-        items.map((item) => Connection.fromJson(item)).toList();
+            items.map((item) => Connection.fromJson(item)).toList();
 
         for (Connection connection in loadedConnections) {
           await precacheImage(NetworkImage(connection.picture), context);
@@ -68,7 +72,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
   // Retrieve all the chats of the current user
   Future<void> fetchAllChats() async {
     var url = Uri.parse(
-        'https://api2.unipile.com:13237/api/v1/chats?account_id=${dotenv.env['UNIPILE_ACCOUNT_ID']}');
+        'https://api2.unipile.com:13237/api/v1/chats?account_id=${widget.accountId}');
 
     var headers = {
       'X-API-KEY': dotenv.env['UNIPILE_ACCESS_TOKEN']!,
@@ -98,7 +102,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
   // Get the count of all the unread messages of a chat
   int getUnreadCount(String attendeeId) {
     Chat? chat = chats.firstWhere(
-          (chat) => chat.attendeeId == attendeeId,
+      (chat) => chat.attendeeId == attendeeId,
       orElse: () => Chat(
         id: '',
         accountId: '',
@@ -110,9 +114,47 @@ class _ConnectionPageState extends State<ConnectionPage> {
     return chat.unreadCount ?? 0;
   }
 
-  // Function to start a new chat
-  Future<void> startNewChat(String attendeesIds, String accountId) async {
-    // Implement your logic to start a new chat here
+  //To start a new chat
+  Future<void> startNewChat(
+      String attendeesIds, String accountId, Connection connection) async {
+    print("ouiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii") ;
+    var url = Uri.parse('https://api2.unipile.com:13237/api/v1/chats');
+    var headers = {
+      'X-API-KEY': dotenv.env['UNIPILE_ACCESS_TOKEN']!,
+      'accept': 'application/json',
+      'content-type': 'multipart/form-data',
+    };
+
+    var request = http.MultipartRequest('POST', url)
+      ..headers.addAll(headers)
+      ..fields['attendees_ids'] = attendeesIds
+      ..fields['account_id'] = accountId
+      ..fields['text'] = "";
+
+    try {
+      var response = await request.send();
+      print("piz ${response.statusCode}");
+      print(accountId);
+      print(attendeesIds);
+      print("=============================================================");
+      if (response.statusCode == 201) {
+        print('Chat started successfully.');
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => MessagePage(
+                chatId: chats
+                    .firstWhere((chat) => chat.attendeeId == attendeesIds)
+                    .id,
+                contact: connection),
+          ),
+        );
+      } else {
+        print('Failed to start chat. Status code: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error starting chat: $e');
+    }
   }
 
   // Function for handling swipe-to-refresh
@@ -125,103 +167,103 @@ class _ConnectionPageState extends State<ConnectionPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         title: Text('Discutez avec vos connections'),
       ),
       body: RefreshIndicator(
         onRefresh: _refreshContacts,
         child: _isLoading
             ? Center(
-          child: CircularProgressIndicator(),
-        )
-            : ListView.builder(
-          itemCount: connections.length,
-          itemBuilder: (context, index) {
-            Connection connection = connections[index];
-            bool chatExists = isChatExist(connection.id);
-            int unreadCount = getUnreadCount(connection.id);
-
-            return ListTile(
-              leading: CircleAvatar(
-                backgroundImage: NetworkImage(connection.picture),
-              ),
-              title: Text(connection.name),
-              trailing: chatExists && unreadCount > 0
-                  ? Stack(
-                children: [
-                  IconButton(
-                    icon: Icon(Icons.message),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => MessagePage(
-                              chatId: chats
-                                  .firstWhere((chat) =>
-                              chat.attendeeId ==
-                                  connection.id)
-                                  .id,
-                              contact: connection),
-                        ),
-                      );
-                    },
-                  ),
-                  Positioned(
-                    right: 0,
-                    top: 0,
-                    child: Container(
-                      padding: EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.green,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      constraints: BoxConstraints(
-                        minWidth: 24,
-                        minHeight: 24,
-                      ),
-                      child: Text(
-                        '$unreadCount',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-                ],
+                child: CircularProgressIndicator(),
               )
-                  : chatExists && unreadCount == 0
-                  ? null // Do not show message icon if no unread messages
-                  : ElevatedButton(
-                onPressed: () {
-                  startNewChat(connection.id,
-                      dotenv.env['UNIPILE_ACCOUNT_ID']!);
-                },
-                child: Text('Start New Chat'),
-              ),
-              onTap: () {
-                if (chatExists) {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => MessagePage(
-                          chatId: chats
-                              .firstWhere((chat) =>
-                          chat.attendeeId == connection.id)
-                              .id,
-                          contact: connection),
+            : ListView.builder(
+                itemCount: connections.length,
+                itemBuilder: (context, index) {
+                  Connection connection = connections[index];
+                  bool chatExists = isChatExist(connection.id);
+                  int unreadCount = getUnreadCount(connection.id);
+
+                  return ListTile(
+                    leading: CircleAvatar(
+                      backgroundImage: NetworkImage(connection.picture),
                     ),
+                    title: Text(connection.name),
+                    trailing: chatExists && unreadCount > 0
+                        ? Stack(
+                            children: [
+                              IconButton(
+                                icon: Icon(Icons.message),
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => MessagePage(
+                                          chatId: chats
+                                              .firstWhere((chat) =>
+                                                  chat.attendeeId ==
+                                                  connection.id)
+                                              .id,
+                                          contact: connection),
+                                    ),
+                                  );
+                                },
+                              ),
+                              Positioned(
+                                right: 0,
+                                top: 0,
+                                child: Container(
+                                  padding: EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  constraints: BoxConstraints(
+                                    minWidth: 24,
+                                    minHeight: 24,
+                                  ),
+                                  child: Text(
+                                    '$unreadCount',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        : chatExists && unreadCount == 0
+                            ? null // Do not show message icon if no unread messages
+                            : ElevatedButton(
+                                onPressed: () async {
+                                  await startNewChat(connection.id,
+                                      widget.accountId, connection);
+                                },
+                                child: Text('Start New Chat'),
+                              ),
+                    onTap: () async {
+                      if (chatExists) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => MessagePage(
+                                chatId: chats
+                                    .firstWhere((chat) =>
+                                        chat.attendeeId == connection.id)
+                                    .id,
+                                contact: connection),
+                          ),
+                        );
+                      } else {
+                        await startNewChat(
+                            connection.id, widget.accountId, connection);
+                      }
+                    },
                   );
-                } else {
-                  startNewChat(
-                      connection.id, dotenv.env['UNIPILE_ACCOUNT_ID']!);
-                }
-              },
-            );
-          },
-        ),
+                },
+              ),
       ),
     );
   }
 }
-

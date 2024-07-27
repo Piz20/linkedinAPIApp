@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+
+import 'LinkedInAccountsPage.dart';
 
 class LoginPage extends StatefulWidget {
   @override
@@ -11,6 +13,7 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   String? _url;
+  late WebViewController webViewController;
 
   @override
   void initState() {
@@ -42,7 +45,7 @@ class _LoginPageState extends State<LoginPage> {
           setState(() {
             _url = jsonResponse['url'];
           });
-          _launchURL(_url!);
+          _initializeWebView();
         } else {
           print('Error: Response does not contain "url" key');
           ScaffoldMessenger.of(context).showSnackBar(
@@ -53,7 +56,8 @@ class _LoginPageState extends State<LoginPage> {
         }
       } else {
         print('Error: Status code ${response.statusCode}');
-        throw Exception('Failed to load link (status code: ${response.statusCode})');
+        throw Exception(
+            'Failed to load link (status code: ${response.statusCode})');
       }
     } catch (e) {
       print('Error: $e');
@@ -65,12 +69,37 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  void _launchURL(String url) async {
-    if (await canLaunch(url)) {
-      await launch(url);
-    } else {
-      throw 'Could not launch $url';
-    }
+  void _initializeWebView() {
+    webViewController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(const Color(0x00000000))
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onProgress: (int progress) {
+            // Update loading bar.
+          },
+          onPageStarted: (String url) {},
+          onPageFinished: (String url) {
+          },
+          onHttpError: (HttpResponseError error) {},
+          onWebResourceError: (WebResourceError error) {},
+          onNavigationRequest: (NavigationRequest request) {
+            if (request.url.startsWith('https://www.youtube.com/')) {
+              return NavigationDecision.prevent;
+            }
+            return NavigationDecision.navigate;
+          },
+        ),
+      )
+      ..loadRequest(Uri.parse(_url!));
+  }
+
+  void _navigateToLinkedInAccountPage() {
+    // Replace with your navigation logic to LinkedInAccountPage
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => LinkedInAccountsPage()),
+    );
   }
 
   @override
@@ -80,14 +109,24 @@ class _LoginPageState extends State<LoginPage> {
         title: const Text('Login'),
       ),
       body: Center(
-        child: _url == null
-            ? CircularProgressIndicator()
-            : ElevatedButton(
-          onPressed: () => _launchURL(_url!),
-          child: Text('Open WebView'),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+              onPressed: _navigateToLinkedInAccountPage,
+              child: Text('Choose an Account'),
+            ),
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 10),
+              child: Text('OR'),
+            ),
+            if (_url != null)
+              Expanded(
+                child: WebViewWidget(controller: webViewController),
+              ),
+          ],
         ),
       ),
     );
   }
 }
-

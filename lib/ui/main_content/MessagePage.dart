@@ -9,6 +9,8 @@ import '../../models/Message.dart';
 
 import 'package:http/http.dart' as http;
 
+import '../../models/User.dart';
+
 
 class MessagePage extends StatefulWidget {
   final Connection contact;
@@ -24,6 +26,7 @@ class _MessagePageState extends State<MessagePage> {
   final TextEditingController _controller = TextEditingController();
   List<Message> messages = [];
   bool _isSending = true;
+  UserData? currentUser ;
 
   @override
   void initState() {

@@ -1,90 +1,72 @@
+import 'dart:convert';
+
+import 'package:Linkedin/ui/Authentication/LoginPage.dart';
 import 'package:Linkedin/ui/main_content/ConnectionPage.dart';
 import 'package:Linkedin/ui/main_content/PostPage.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-
-import '../../models/Post.dart';
+import 'package:http/http.dart' as http;
 import '../../models/User.dart';
-import '../Authentication/LoginPage.dart';
+import 'package:flutter/services.dart'; // Importez ce package pour utiliser SystemNavigator
 
 class MainPage extends StatefulWidget {
-  final User? currentUser;
+  final String accountId;
 
-  const MainPage({Key? key, this.currentUser}) : super(key: key);
+  MainPage({Key? key, required this.accountId}) : super(key: key);
 
   @override
   _MainPageState createState() => _MainPageState();
 }
 
 class _MainPageState extends State<MainPage> {
-  int _selectedIndex = 0; // 0 for Home, 1 for Settings, etc.
+  int _selectedIndex = 0; // 0 for Posts, 1 for Contacts, etc.
 
-  late User user;
+  UserData? currentUserData;
 
   final _storage = FlutterSecureStorage();
 
   @override
   void initState() {
     super.initState();
-    if (widget.currentUser != null) {
-      user = widget.currentUser!;
+    fetchUserData();
+  }
+
+  Future<void> fetchUserData() async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+            'https://api2.unipile.com:13237/api/v1/users/me?account_id=${widget.accountId}'),
+        headers: {
+          'X-API-KEY': dotenv.env['UNIPILE_ACCESS_TOKEN']!,
+          'accept': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+
+        setState(() {
+          currentUserData = UserData.fromJson(data);
+        });
+      } else {
+        throw Exception('Failed to load user data');
+      }
+    } catch (e) {
+      print('Error fetching user data: $e');
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_getTitle()), // Set the title based on _selectedIndex
-      ),
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: <Widget>[
-            UserAccountsDrawerHeader(
-                accountName: Text(
-                  user.name,
-                  style: TextStyle(color: Colors.white),
-                ),
-                accountEmail: Text(
-                  user.email,
-                  style: TextStyle(color: Colors.white),
-                ),
-                currentAccountPicture: CircleAvatar(
-                  backgroundImage: NetworkImage(user.picture),
-                )),
-            _buildDrawerItem(
-              icon: Icons.post_add,
-              text: 'Posts',
-              iconColor: Colors.blue,
-              textColor: Colors.blue,
-              onTap: () => _onItemTap(0),
-            ),
-            _buildDrawerItem(
-              icon: Icons.chat,
-              iconColor: Colors.blue,
-              text: 'Chats',
-              textColor: Colors.blue,
-              onTap: () => _onItemTap(1),
-            ),
-            // Add more items here if needed
-            Divider(),
-            _buildDrawerItem(
-              icon: Icons.exit_to_app,
-              iconColor: Colors.blue,
-              text: 'Sign Out',
-              textColor: Colors.blue,
-              onTap: _signOut,
-            ),
-          ],
-        ),
-      ),
-      body: Stack(
-        children: <Widget>[
-          _buildBody(), // Main content area
-        ],
-      ),
-    );
+  Future<bool> _onWillPop() async {
+    // Close the app when the back button is pressed
+    SystemNavigator.pop();
+    return Future.value(false); // Return false to prevent default behavior
+  }
+
+  void _onItemTap(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
   }
 
   Widget _buildDrawerItem(
@@ -94,14 +76,8 @@ class _MainPageState extends State<MainPage> {
       Color? iconColor,
       VoidCallback? onTap}) {
     return ListTile(
-      leading: Icon(
-        icon,
-        color: iconColor ?? null,
-      ),
-      title: Text(
-        text,
-        style: TextStyle(color: textColor ?? null),
-      ),
+      leading: Icon(icon, color: iconColor ?? null),
+      title: Text(text, style: TextStyle(color: textColor ?? null)),
       onTap: () {
         Navigator.of(context).pop(); // Close the drawer
         if (onTap != null) onTap();
@@ -109,33 +85,15 @@ class _MainPageState extends State<MainPage> {
     );
   }
 
-  void _onItemTap(int index) {
-    setState(() {
-      _selectedIndex = index; // Update selected index
-    });
-  }
-
   Widget _buildBody() {
     switch (_selectedIndex) {
-      case 0: // Accueil
-        return PostPage() ;
-      case 1: // Contacts
-        return ConnectionPage();
-      // Ajoutez plus de cas pour d'autres indices/pages
+      case 0:
+        return PostPage(accountId: widget.accountId);
+      case 1:
+        return ConnectionPage(accountId: widget.accountId);
       default:
-        return Center(
-          child: Text("Page not found"),
-        );
+        return Center(child: Text("Page not found"));
     }
-  }
-
-  //Method helpful to fetch all datas in the fluttersecurestorage
-  Future<List<Map<String, String>>> getAllEntries() async {
-    final _storage = const FlutterSecureStorage();
-    final allValues = await _storage.readAll();
-    return allValues.entries
-        .map((entry) => {'key': entry.key, 'value': entry.value})
-        .toList();
   }
 
   String _getTitle() {
@@ -149,48 +107,110 @@ class _MainPageState extends State<MainPage> {
     }
   }
 
-  // Method to signOut of the Application
-  void _signOut() async {
-    final shouldLogout = await showDialog(
+  void _signOut(BuildContext context) async {
+    // Show a confirmation dialog
+    final bool? shouldSignOut = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Sign Out Confirmation'),
-        content: Text('Are you sure you want to sign out?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false), // Cancel
-            child: Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true), // Confirm
-            child: Text('Sign Out'),
-          ),
-        ],
-        backgroundColor: Colors.white,
-      ),
+      barrierDismissible: false, // Prevent dismissing by tapping outside
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Confirm Sign Out'),
+          content: Text('Are you sure you want to sign out?'),
+          backgroundColor: Colors.white,
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(false); // Return false if cancelled
+              },
+              child: Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(true); // Return true if confirmed
+              },
+              child: Text('Sign Out'),
+            ),
+          ],
+        );
+      },
     );
 
-    if (shouldLogout ?? false) {
-      try {
-        // Clear all entries in FlutterSecureStorage
-        await _storage.deleteAll();
-
-        final allEntries = await _storage.readAll();
-        // We add 2 seconds to ensure that all datas have been deleted
-        await Future.delayed(Duration(seconds: 2));
-
-        if (allEntries.isEmpty) {
-          // We go to the login page
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => LoginPage()),
-          );
-        }
-      } catch (error) {
-        // Handle errors that might occur during sign-out
-        print('Error signing out: ${error.toString()}');
-        // Add more specific error handling here
-      }
+    // If the user confirms, perform the sign out
+    if (shouldSignOut == true) {
+      await _storage.write(key: "accountId", value: "");
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => LoginPage()),
+      );
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return WillPopScope(
+      onWillPop: _onWillPop, // Close the app when the back button is pressed
+      child: Scaffold(
+        appBar: AppBar(
+          automaticallyImplyLeading: false,
+          title: Text(_getTitle()), // Set the title based on _selectedIndex
+        ),
+        drawer: Drawer(
+          child: ListView(
+            padding: EdgeInsets.zero,
+            children: <Widget>[
+              UserAccountsDrawerHeader(
+                currentAccountPicture: CircleAvatar(
+                  backgroundImage: currentUserData?.profilePictureUrl != null
+                      ? NetworkImage(currentUserData!.profilePictureUrl)
+                      : null,
+                  child: currentUserData?.profilePictureUrl == null
+                      ? Icon(Icons.person)
+                      : null,
+                ),
+                accountName: Text(
+                  currentUserData != null
+                      ? '${currentUserData!.firstName} ${currentUserData!.lastName}'
+                      : 'Nom Inconnu',
+                  style: TextStyle(color: Colors.white),
+                ),
+                accountEmail: Text(
+                  currentUserData != null && currentUserData!.email.isNotEmpty
+                      ? currentUserData!.email
+                      : 'Email Inconnu',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+              _buildDrawerItem(
+                icon: Icons.post_add,
+                text: 'Posts',
+                iconColor: Colors.blue,
+                textColor: Colors.blue,
+                onTap: () => _onItemTap(0),
+              ),
+              _buildDrawerItem(
+                icon: Icons.chat,
+                iconColor: Colors.blue,
+                text: 'Chats',
+                textColor: Colors.blue,
+                onTap: () => _onItemTap(1),
+              ),
+              Divider(),
+              _buildDrawerItem(
+                icon: Icons.exit_to_app,
+                iconColor: Colors.blue,
+                text: 'Sign Out',
+                textColor: Colors.blue,
+                onTap: () => _signOut(context),
+              ),
+            ],
+          ),
+        ),
+        body: Stack(
+          children: <Widget>[
+            _buildBody(), // Main content area
+          ],
+        ),
+      ),
+    );
   }
 }

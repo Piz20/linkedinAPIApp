@@ -53,7 +53,7 @@ class UserData {
   final String profilePictureUrl;
   final String occupation;
   final String? location;
-  final String? email;
+  final String email;
 
   UserData({
     required this.providerId,
@@ -62,7 +62,7 @@ class UserData {
     required this.profilePictureUrl,
     required this.occupation,
     this.location,
-    this.email,
+    required this.email,
   });
 
   factory UserData.fromJson(Map<String, dynamic> json) {

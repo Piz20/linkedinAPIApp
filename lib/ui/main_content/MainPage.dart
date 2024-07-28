@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:Linkedin/ui/Authentication/LoginPage.dart';
 import 'package:Linkedin/ui/main_content/ConnectionPage.dart';
 import 'package:Linkedin/ui/main_content/PostPage.dart';
+import 'package:Linkedin/ui/main_content/UserDataPage.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -156,28 +157,42 @@ class _MainPageState extends State<MainPage> {
         ),
         drawer: Drawer(
           child: ListView(
-            padding: EdgeInsets.zero,
-            children: <Widget>[
+            children: [
               UserAccountsDrawerHeader(
-                currentAccountPicture: CircleAvatar(
-                  backgroundImage: currentUserData?.profilePictureUrl != null
-                      ? NetworkImage(currentUserData!.profilePictureUrl)
-                      : null,
-                  child: currentUserData?.profilePictureUrl == null
-                      ? Icon(Icons.person)
-                      : null,
+                currentAccountPicture: GestureDetector(
+                  onTap: () {
+                    _navigateToUserDataPage(context,currentUserData!);
+                  },
+                  child: CircleAvatar(
+                    backgroundImage: currentUserData?.profilePictureUrl != null
+                        ? NetworkImage(currentUserData!.profilePictureUrl)
+                        : null,
+                    child: currentUserData?.profilePictureUrl == null
+                        ? Icon(Icons.person)
+                        : null,
+                  ),
                 ),
-                accountName: Text(
-                  currentUserData != null
-                      ? '${currentUserData!.firstName} ${currentUserData!.lastName}'
-                      : 'Nom Inconnu',
-                  style: TextStyle(color: Colors.white),
+                accountName: GestureDetector(
+                  onTap: () {
+                    _navigateToUserDataPage(context,currentUserData!);
+                  },
+                  child: Text(
+                    currentUserData != null
+                        ? '${currentUserData!.firstName} ${currentUserData!.lastName}'
+                        : 'Nom Inconnu',
+                    style: TextStyle(color: Colors.white),
+                  ),
                 ),
-                accountEmail: Text(
-                  currentUserData != null && currentUserData!.email.isNotEmpty
-                      ? currentUserData!.email
-                      : 'Email Inconnu',
-                  style: TextStyle(color: Colors.white),
+                accountEmail: GestureDetector(
+                  onTap: () {
+                    _navigateToUserDataPage(context,currentUserData!);
+                  },
+                  child: Text(
+                    currentUserData != null && currentUserData!.email.isNotEmpty
+                        ? currentUserData!.email
+                        : 'Email Inconnu',
+                    style: TextStyle(color: Colors.white),
+                  ),
                 ),
               ),
               _buildDrawerItem(
@@ -212,5 +227,13 @@ class _MainPageState extends State<MainPage> {
         ),
       ),
     );
+  }
+
+  void _navigateToUserDataPage(BuildContext context , UserData currentUserData) {
+    Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => UserDataPage(currentUserData: currentUserData,),
+        ));
   }
 }

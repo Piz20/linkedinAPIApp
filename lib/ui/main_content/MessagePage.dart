@@ -11,7 +11,6 @@ import 'package:http/http.dart' as http;
 
 import '../../models/User.dart';
 
-
 class MessagePage extends StatefulWidget {
   final Connection contact;
   final String chatId;
@@ -26,7 +25,7 @@ class _MessagePageState extends State<MessagePage> {
   final TextEditingController _controller = TextEditingController();
   List<Message> messages = [];
   bool _isSending = true;
-  UserData? currentUser ;
+  UserData? currentUser;
 
   @override
   void initState() {
@@ -36,8 +35,8 @@ class _MessagePageState extends State<MessagePage> {
 
   // We retrieve the messages of the current user
   Future<void> fetchChatMessages() async {
-    var url = Uri.parse("https://api2.unipile.com:13237/api/v1/chats/${widget
-        .chatId}/messages?limit=10");
+    var url = Uri.parse(
+        "https://api2.unipile.com:13237/api/v1/chats/${widget.chatId}/messages?limit=10");
     var headers = {
       'Accept': 'application/json',
       'X-Api-Key': dotenv.env['UNIPILE_ACCESS_TOKEN']!
@@ -72,8 +71,7 @@ class _MessagePageState extends State<MessagePage> {
     });
 
     var url = Uri.parse(
-        'https://api2.unipile.com:13237/api/v1/chats/${widget
-            .chatId}/messages');
+        'https://api2.unipile.com:13237/api/v1/chats/${widget.chatId}/messages');
 
     var request = http.MultipartRequest('POST', url)
       ..headers['X-API-KEY'] = dotenv.env['UNIPILE_ACCESS_TOKEN']!
@@ -87,8 +85,7 @@ class _MessagePageState extends State<MessagePage> {
             'Message envoyé avec succès================================================');
       } else {
         throw Exception(
-            'Échec de l\'envoi du message------------------------- : ${response
-                .statusCode}');
+            'Échec de l\'envoi du message------------------------- : ${response.statusCode}');
       }
     } catch (error) {
       // Handle error (e.g., display user-friendly message)
@@ -111,7 +108,13 @@ class _MessagePageState extends State<MessagePage> {
               backgroundImage: NetworkImage(widget.contact.picture),
             ),
             SizedBox(width: 10), // Espacement entre l'avatar et le titre
-            Text(widget.contact.name),
+            Expanded(
+              child: Text(
+                widget.contact.name,
+                overflow: TextOverflow.ellipsis,
+                softWrap: false,
+              ),
+            ),
           ],
         ),
         leading: IconButton(
@@ -127,7 +130,8 @@ class _MessagePageState extends State<MessagePage> {
           children: <Widget>[
             Divider(height: 1.0),
             Expanded(
-              child: _buildMessagesList(), // Utilisation d'une méthode séparée pour construire la liste de messages
+              child:
+                  _buildMessagesList(), // Utilisation d'une méthode séparée pour construire la liste de messages
             ),
             Divider(height: 1.0),
             _buildTextComposer(),
@@ -156,27 +160,23 @@ class _MessagePageState extends State<MessagePage> {
 
             // Formatter l'heure d'envoi du message
             String formattedTime =
-            DateFormat.Hm().format(message.timestamp.toLocal());
+                DateFormat.Hm().format(message.timestamp.toLocal());
 
             return Padding(
               padding: EdgeInsets.symmetric(vertical: 4.0),
               child: Row(
-                mainAxisAlignment: isSender
-                    ? MainAxisAlignment.start
-                    : MainAxisAlignment.end,
+                mainAxisAlignment:
+                    isSender ? MainAxisAlignment.start : MainAxisAlignment.end,
                 children: <Widget>[
                   if (isSender)
                     CircleAvatar(
-                      backgroundImage:
-                      NetworkImage(widget.contact.picture),
+                      backgroundImage: NetworkImage(widget.contact.picture),
                     ),
                   SizedBox(width: 8.0),
                   Container(
                     constraints: BoxConstraints(maxWidth: 250),
                     decoration: BoxDecoration(
-                      color: isSender
-                          ? Colors.grey[300]
-                          : Colors.blueAccent,
+                      color: isSender ? Colors.grey[300] : Colors.blueAccent,
                       borderRadius: BorderRadius.circular(8.0),
                     ),
                     padding: EdgeInsets.all(12.0),
@@ -211,9 +211,7 @@ class _MessagePageState extends State<MessagePage> {
     final double initialHeight = 50.0; // Hauteur initiale de la zone de texte
 
     return IconTheme(
-      data: IconThemeData(color: Theme
-          .of(context)
-          .cardColor),
+      data: IconThemeData(color: Theme.of(context).cardColor),
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 8.0),
         child: Row(
@@ -232,8 +230,7 @@ class _MessagePageState extends State<MessagePage> {
                   physics: ClampingScrollPhysics(),
                   // Désactiver le rebondissement de défilement
                   child: ConstrainedBox(
-                    constraints:
-                    BoxConstraints(maxHeight: initialHeight * 4),
+                    constraints: BoxConstraints(maxHeight: initialHeight * 4),
                     // Limite de 4 fois la hauteur initiale
                     child: TextField(
                       controller: _controller,

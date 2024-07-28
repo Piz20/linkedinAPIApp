@@ -32,7 +32,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
   // Retrieve all the relations of the current User
   Future<void> fetchAllConnections() async {
     var url = Uri.parse(
-        'https://api2.unipile.com:13237/api/v1/users/relations?limit=500&account_id=${widget.accountId}');
+        'https://api2.unipile.com:13237/api/v1/users/relations?limit=50&account_id=${widget.accountId}');
     var headers = {
       'Accept': 'application/json',
       'X-Api-Key': dotenv.env['UNIPILE_ACCESS_TOKEN']!
@@ -111,13 +111,12 @@ class _ConnectionPageState extends State<ConnectionPage> {
       ),
     );
 
-    return chat.unreadCount ?? 0;
+    return chat.unreadCount;
   }
 
   //To start a new chat
   Future<void> startNewChat(
       String attendeesIds, String accountId, Connection connection) async {
-    print("ouiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii") ;
     var url = Uri.parse('https://api2.unipile.com:13237/api/v1/chats');
     var headers = {
       'X-API-KEY': dotenv.env['UNIPILE_ACCESS_TOKEN']!,
@@ -129,16 +128,14 @@ class _ConnectionPageState extends State<ConnectionPage> {
       ..headers.addAll(headers)
       ..fields['attendees_ids'] = attendeesIds
       ..fields['account_id'] = accountId
-      ..fields['text'] = "";
+      ..fields['text'] = "Hello !";
 
     try {
       var response = await request.send();
-      print("piz ${response.statusCode}");
-      print(accountId);
-      print(attendeesIds);
-      print("=============================================================");
+
       if (response.statusCode == 201) {
         print('Chat started successfully.');
+        await fetchAllChats();
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -187,7 +184,14 @@ class _ConnectionPageState extends State<ConnectionPage> {
                     leading: CircleAvatar(
                       backgroundImage: NetworkImage(connection.picture),
                     ),
-                    title: Text(connection.name),
+                    title: Text(
+                      connection.name,
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: Text(
+                      connection.headline,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                     trailing: chatExists && unreadCount > 0
                         ? Stack(
                             children: [
@@ -237,10 +241,10 @@ class _ConnectionPageState extends State<ConnectionPage> {
                             ? null // Do not show message icon if no unread messages
                             : ElevatedButton(
                                 onPressed: () async {
-                                  await startNewChat(connection.id,
-                                      widget.accountId, connection);
+                                  startNewChat(connection.id, widget.accountId,
+                                      connection);
                                 },
-                                child: Text('Start New Chat'),
+                                child: Text('Say Hello !'),
                               ),
                     onTap: () async {
                       if (chatExists) {
@@ -256,7 +260,7 @@ class _ConnectionPageState extends State<ConnectionPage> {
                           ),
                         );
                       } else {
-                        await startNewChat(
+                        startNewChat(
                             connection.id, widget.accountId, connection);
                       }
                     },

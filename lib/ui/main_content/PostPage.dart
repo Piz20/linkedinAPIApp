@@ -24,6 +24,8 @@ class _PostPageState extends State<PostPage> {
   String? selectedUserId;
   Connection? selectedConnection;
 
+  final TextEditingController _textController = TextEditingController();
+
   bool _isLoading = true;
 
   @override
@@ -39,6 +41,7 @@ class _PostPageState extends State<PostPage> {
     fetchAllConnections();
   }
 
+  // Ret
   Future<UserData> fetchUserData() async {
     final response = await http.get(
       Uri.parse(
@@ -57,9 +60,10 @@ class _PostPageState extends State<PostPage> {
     }
   }
 
+  //Retrieve all the connections of an user
   Future<void> fetchAllConnections() async {
     var url = Uri.parse(
-        'https://api2.unipile.com:13237/api/v1/users/relations?account_id=${widget.accountId}');
+        'https://api2.unipile.com:13237/api/v1/users/relations?limit=50&account_id=${widget.accountId}');
     var headers = {
       'Accept': 'application/json',
       'X-Api-Key': dotenv.env['UNIPILE_ACCESS_TOKEN']!
@@ -103,11 +107,12 @@ class _PostPageState extends State<PostPage> {
     }
   }
 
+  // We retrieve all the selected user posts
   Future<void> fetchUserPosts(String userId) async {
     try {
       final response = await http.get(
         Uri.parse(
-            'https://api2.unipile.com:13237/api/v1/users/$userId/posts?account_id=${dotenv.env['UNIPILE_ACCOUNT_ID']}'),
+            'https://api2.unipile.com:13237/api/v1/users/$userId/posts?account_id=${widget.accountId}'),
         headers: {
           'X-API-KEY': dotenv.env['UNIPILE_ACCESS_TOKEN']!,
           'accept': 'application/json',
@@ -143,73 +148,170 @@ class _PostPageState extends State<PostPage> {
     }
   }
 
+  Future<void> createTextPost(
+      BuildContext context, String accountId, String text) async {
+    var url = Uri.parse('https://api2.unipile.com:13237/api/v1/posts');
+
+    var request = http.MultipartRequest('POST', url)
+      ..headers['X-API-KEY'] = dotenv.env["UNIPILE_ACCESS_TOKEN"]!
+      ..headers['accept'] = 'application/json'
+      ..fields['account_id'] = accountId
+      ..fields['text'] = text;
+
+    var response = await request.send();
+
+    if (response.statusCode == 201) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Post created successfully')),
+      );
+      setState(() {
+        _textController.clear();
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('Failed to create post: ${response.statusCode}')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-        appBar: AppBar(
-          automaticallyImplyLeading: false,
-          title: DropdownButtonHideUnderline(
-            child: DropdownButton<String>(
-              value: selectedConnection?.id,
-              hint: Text(
-                _getDropdownHint(),
-                // Get the hint based on the selected connection
-                overflow: TextOverflow.ellipsis,
-              ),
-              onChanged: (String? newValue) {
-                setState(() {
-                  selectedConnection =
-                      connections.firstWhere((c) => c.id == newValue);
-                  fetchUserPosts(newValue!);
-                });
-              },
-              items: connections
-                  .map<DropdownMenuItem<String>>((Connection connection) {
-                return DropdownMenuItem<String>(
-                  value: connection.id,
-                  child: Container(
-                    color: Colors.transparent,
-                    // Set background color to transparent
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          backgroundImage: NetworkImage(connection.picture),
+      appBar: AppBar(
+        automaticallyImplyLeading: false,
+        title: DropdownButtonHideUnderline(
+          child: DropdownButton<String>(
+            value: selectedConnection?.id,
+            hint: Text(
+              _getDropdownHint(),
+              overflow: TextOverflow.ellipsis,
+            ),
+            onChanged: (String? newValue) {
+              setState(() {
+                selectedConnection =
+                    connections.firstWhere((c) => c.id == newValue);
+                fetchUserPosts(newValue!);
+              });
+            },
+            items: connections
+                .map<DropdownMenuItem<String>>((Connection connection) {
+              return DropdownMenuItem<String>(
+                value: connection.id,
+                child: Container(
+                  color: Colors.transparent,
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        backgroundImage: NetworkImage(connection.picture),
+                      ),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          connection.name,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            connection.name,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                );
-              }).toList(),
-              // Set the width of the DropdownButton
-              itemHeight: 60,
-              // Adjust item height if necessary
-              isExpanded: true,
-              dropdownColor: Colors.white,
+                ),
+              );
+            }).toList(),
+            itemHeight: 60,
+            isExpanded: true,
+            dropdownColor: Colors.white,
+          ),
+        ),
+        centerTitle: false,
+        actions: [],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _refreshPosts,
+        child: _isLoading
+            ? Center(child: CircularProgressIndicator())
+            : ListView.builder(
+                itemCount: posts.length,
+                itemBuilder: (context, index) {
+                  return _buildPostCard(posts[index]);
+                },
+              ),
+      ),
+      floatingActionButton: (selectedConnection == null ||
+              selectedConnection!.id == currentUserData!.providerId)
+          ? FloatingActionButton(
+              onPressed: _openPostModal,
+              child: Icon(Icons.add),
+              backgroundColor: Colors.blue,
+            )
+          : null,
+    );
+  }
+
+  void _openPostModal() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20.0),
+          ),
+          child: Container(
+            color: Colors.white,
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    CircleAvatar(
+                      backgroundImage:
+                          NetworkImage(currentUserData!.profilePictureUrl),
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '${currentUserData!.firstName} ${currentUserData!.lastName}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 20),
+                TextField(
+                  controller: _textController,
+                  decoration: const InputDecoration(
+                    hintText: "What do you want to talk about ?",
+                  ),
+                  maxLines: null,
+                ),
+                SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.photo),
+                      tooltip: "Pick images not available for now",
+                      onPressed: () => {},
+                    ),
+                    Spacer(),
+                    ElevatedButton(
+                      onPressed: () async => {
+                        await createTextPost(
+                            context, widget.accountId, _textController.text)
+                      },
+                      child: Text('Post'),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-          centerTitle: false, // Align title to the left
-          actions: [
-            // Add any actions if necessary
-          ],
-        ),
-        body: RefreshIndicator(
-          onRefresh: _refreshPosts,
-          child: _isLoading
-              ? Center(child: CircularProgressIndicator())
-              : ListView.builder(
-                  itemCount: posts.length,
-                  itemBuilder: (context, index) {
-                    return _buildPostCard(posts[index]);
-                  },
-                ),
-        ));
+        );
+      },
+    );
   }
 
   Widget _buildPostCard(Post post) {
@@ -284,7 +386,15 @@ class _PostPageState extends State<PostPage> {
             ),
             if (post.attachments.isNotEmpty) ...[
               SizedBox(height: 10.0),
-              Image.network(post.attachments[0].url),
+              for (var attachment in post.attachments)
+                if (attachment.type == 'img')
+                  Image.network(attachment.url)
+                else if (attachment.type == 'video')
+                  const Text(
+                    'Videos are unsupported for the moment',
+                    style: TextStyle(
+                        color: Colors.grey, fontWeight: FontWeight.bold),
+                  ),
             ],
             SizedBox(height: 10.0),
             Row(
@@ -294,6 +404,7 @@ class _PostPageState extends State<PostPage> {
                     Icon(
                       Icons.thumb_up,
                       color: Colors.blue,
+
                     ),
                     SizedBox(width: 5),
                     Text('${post.reactionCounter} likes'),
@@ -327,7 +438,7 @@ class _PostPageState extends State<PostPage> {
                 ),
                 SizedBox(width: 20),
                 Row(
-                  children: [
+                   children: [
                     Icon(
                       Icons.repeat,
                       color: Colors.blue,
@@ -347,12 +458,12 @@ class _PostPageState extends State<PostPage> {
   String _getDropdownHint() {
     if (selectedConnection != null) {
       if (selectedConnection!.id == currentUserData!.providerId) {
-        return 'Mes posts';
+        return 'My posts';
       } else {
         return selectedConnection!.name;
       }
     } else {
-      return 'Mes posts';
+      return 'My posts';
     }
   }
 }
